@@ -1,0 +1,77 @@
+# Один файл — четыре сервиса:
+#   db    — Postgres для всех окружений
+#   web   — приложение в продакшен-режиме (финальный образ)
+#   dev   — локальная разработка (volume mount + hot reload)
+#   tests — прогон тестов и линтера (используется в CI)
+
+x-app-env: &app-env
+  DATABASE_HOST: db
+  DATABASE_PORT: 5432
+  DATABASE_NAME: postgres
+  DATABASE_USERNAME: postgres
+  DATABASE_PASSWORD: postgres
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: ${DOCKERHUB_USERNAME:-local}/js-fastify-blog:latest
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *app-env
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *app-env
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    command: ["npm", "run", "dev"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    environment:
+      <<: *app-env
+      NODE_ENV: test
+    command: ["npm", "test"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

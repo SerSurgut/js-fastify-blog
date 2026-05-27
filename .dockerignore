@@ -2,3 +2,12 @@ node_modules/
 dist/
 .env
 *.sqlite
+.git/
+.github/
+.gitignore
+.dockerignore
+.idea/
+.vscode/
+README.md
+LICENSE
+*.log

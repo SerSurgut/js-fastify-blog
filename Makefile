@@ -32,3 +32,29 @@ lint-fix:
 
 test:
 	NODE_ENV=test npm test -s
+
+# --- Docker Compose ---
+
+compose-build:
+	docker compose build
+
+compose-dev:
+	docker compose up dev
+
+compose-prod:
+	docker compose up web
+
+compose-test:
+	docker compose run --rm tests
+
+compose-lint:
+	docker compose run --rm tests npx eslint .
+
+compose-bash:
+	docker compose run --rm dev bash
+
+compose-down:
+	docker compose down -v
+
+compose-logs:
+	docker compose logs -f

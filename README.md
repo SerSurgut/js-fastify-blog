@@ -1,69 +1,103 @@
 # JS Fastify Blog
 
-[![Main](https://github.com/hexlet-components/js-fastify-blog/actions/workflows/main.yml/badge.svg)](https://github.com/hexlet-components/js-fastify-blog/actions/workflows/main.yml)
+Учебный проект: блог на Fastify, упакованный в Docker Compose с PostgreSQL, тестами в CI и автоматической публикацией образа на Docker Hub.
 
-## Requirement
+## Требования
 
-* NodeJS v20.6.1
-* Sqlite или PostgreSQL
+* Docker и Docker Compose
+* (опционально) Node.js v20.x — для запуска без Docker
 
-## Commands
+## Архитектура Docker Compose
 
-```bash
-make install
-make dev
-```
+Один файл `docker-compose.yml`, четыре сервиса:
 
-## Run tests with Postgres
+| Сервис  | Назначение                                                                              |
+| ------- | --------------------------------------------------------------------------------------- |
+| `db`    | PostgreSQL 16 с healthcheck                                                             |
+| `web`   | Финальный production-образ (multi-stage build, target `production`), слушает `:8080`    |
+| `dev`   | Разработка: target `builder`, hot reload через монтирование исходников, тоже на `:8080` |
+| `tests` | Прогон тестов и линтера в Postgres (используется в CI и локально)                       |
 
-To run tests with Postgres, you need to edit *config/config.cjs* and under the `test` key comment out the use of SQLite and uncomment the environment variables
+Multi-stage Dockerfile содержит три стадии: `builder` (devDependencies + webpack build) → `prod-deps` (только prod-зависимости) → `production` (на `node:20-slim`).
 
-```js
-  // test: {
-  //   dialect: 'sqlite',
-  //   storage: './database.test.sqlite',
-  // },
-  test: {
-    dialect: 'postgres',
-    database: process.env.DATABASE_NAME,
-    username: process.env.DATABASE_USERNAME,
-    password: process.env.DATABASE_PASSWORD,
-    port: process.env.DATABASE_PORT,
-    host: process.env.DATABASE_HOST,
-  },
-```
-
-Specify environment variables manually or prepare a *.env* file with the command
+## Быстрый старт
 
 ```bash
+# Скопировать пример переменных окружения
 make prepare-env
 ```
 
-In it specify the data to connect to the database
+### Локальная разработка
+
+```bash
+make compose-dev
+# эквивалент: docker compose up dev
+```
+
+Приложение доступно на http://localhost:8080. Изменения в исходниках подхватываются автоматически.
+
+### Запуск приложения в продакшен-режиме
+
+```bash
+make compose-prod
+# эквивалент: docker compose up web
+```
+
+### Прогон тестов
+
+```bash
+make compose-test
+# эквивалент: docker compose run --rm tests
+```
+
+### Запуск линтера в контейнере
+
+```bash
+make compose-lint
+```
+
+### Остановить и удалить контейнеры/тома
+
+```bash
+make compose-down
+```
+
+## Переменные окружения
+
+Файл `.env.example`:
 
 ```dotenv
 DATABASE_NAME=postgres
 DATABASE_USERNAME=postgres
 DATABASE_PASSWORD=postgres
 DATABASE_PORT=5432
-DATABASE_HOST=localhost
+DATABASE_HOST=db   # внутри docker compose; вне Docker — localhost
 ```
 
-## Running an application with Postgres (production)
+## CI / CD
 
-Export environment variables to work with the database or prepare a *.env* file with variables
+GitHub Actions (`.github/workflows/nodejs.yml`) выполняет две джобы:
 
-Run
+1. **test** — поднимает контейнеры из `docker-compose.yml`, прогоняет в сервисе `tests` сначала `eslint`, потом `npm test`.
+2. **publish** — на push в `main` собирает финальный production-образ и публикует его на Docker Hub под тегами `latest` и `<github.sha>`.
+
+GitHub Secrets, нужные для publish:
+
+* `DOCKERHUB_USERNAME` — логин на hub.docker.com
+* `DOCKERHUB_TOKEN` — Personal Access Token из настроек Docker Hub
+
+## Запуск опубликованного образа
 
 ```bash
-make build # build assets
-make start # Open in browser: http://localhost:8080
+docker run --rm -p 8080:8080 \
+  -e DATABASE_HOST=<host> \
+  -e DATABASE_PORT=5432 \
+  -e DATABASE_NAME=postgres \
+  -e DATABASE_USERNAME=postgres \
+  -e DATABASE_PASSWORD=postgres \
+  <ваш-логин>/js-fastify-blog:latest
 ```
 
 ---
 
-[![Hexlet Ltd. logo](https://raw.githubusercontent.com/Hexlet/assets/master/images/hexlet_logo128.png)](https://hexlet.io?utm_source=github&utm_medium=link&utm_campaign=js-fastify-blog)
-
-This repository is created and maintained by the team and the community of Hexlet, an educational project. [Read more about Hexlet](https://hexlet.io?utm_source=github&utm_medium=link&utm_campaign=js-fastify-blog).
-
-See most active contributors on [hexlet-friends](https://friends.hexlet.io/).
+Repository forked from [hexlet-components/js-fastify-blog](https://github.com/hexlet-components/js-fastify-blog).
