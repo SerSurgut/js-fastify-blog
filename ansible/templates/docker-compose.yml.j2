@@ -1,0 +1,42 @@
+# Сгенерировано Ansible-плейбуком. НЕ редактировать вручную на сервере!
+services:
+  db:
+    image: {{ postgres_image }}
+    container_name: redmine-db
+    restart: always
+    environment:
+      POSTGRES_DB: {{ postgres_db }}
+      POSTGRES_USER: {{ postgres_user }}
+      POSTGRES_PASSWORD: {{ postgres_password }}
+      TZ: {{ timezone }}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ postgres_user }} -d {{ postgres_db }}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: {{ redmine_image }}
+    container_name: redmine-app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      REDMINE_DB_POSTGRES: db
+      REDMINE_DB_PORT: 5432
+      REDMINE_DB_DATABASE: {{ postgres_db }}
+      REDMINE_DB_USERNAME: {{ postgres_user }}
+      REDMINE_DB_PASSWORD: {{ postgres_password }}
+      REDMINE_SECRET_KEY_BASE: {{ redmine_secret_key }}
+      TZ: {{ timezone }}
+    ports:
+      - "{{ redmine_port }}:3000"
+    volumes:
+      - redmine_files:/usr/src/redmine/files
+
+volumes:
+  db_data:
+  redmine_files:
